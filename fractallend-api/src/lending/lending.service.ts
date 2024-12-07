@@ -56,4 +56,42 @@ export class LendingService {
     // Implementation here
     return null;
   }
+
+  async getLendingPools(): Promise<LendingPool[]> {
+    // For testing, return mock data
+    return [{
+      id: '1',
+      collateralTokenId: 'test-inscription',
+      lendingTokenId: 'test-cat20',
+      totalDeposited: '1000',
+      totalBorrowed: '500',
+      liquidationThreshold: 0.75,
+      interestRate: 0.05,
+      minimumCollateralRatio: 1.5
+    }];
+  }
+
+  async getLoanPositions(address: string): Promise<LoanPosition[]> {
+    // For testing, return mock data
+    return [{
+      id: '1',
+      borrower: address,
+      poolId: '1',
+      collateralAmount: '10',
+      borrowedAmount: '5',
+      interestAccrued: '0.1',
+      lastUpdateTime: Date.now(),
+      healthFactor: 2,
+      status: 'active'
+    }];
+  }
+
+  async repayLoan(loanId: string, amount: string): Promise<any> {
+    const loan = await this.getLoanPosition(loanId);
+    
+    // For testing, return mock data
+    return {
+      unsignedTx: 'mock_unsigned_tx'
+    };
+  }
 } 
