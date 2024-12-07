@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useWallet } from '@/contexts/WalletContext';
+import { useWallet } from '../contexts/WalletContext';
 import { LoanPosition } from '@/types/lending';
 import { repayLoan } from '@/lib/api';
 
