@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useWallet } from '../contexts/WalletContext';
+import { useWallet } from '@/contexts/WalletContext';
 import { LoanPosition } from '@/types/lending';
-import { repayLoan } from '@/lib/api';
+import { repayLoan, broadcastTransaction } from '@/lib/api';
 
 interface RepayModalProps {
   position: LoanPosition;
@@ -18,22 +18,19 @@ export function RepayModal({ position, onClose }: RepayModalProps) {
   const totalOwed = parseFloat(position.borrowedAmount) + parseFloat(position.interestAccrued);
 
   const handleRepay = async () => {
-    if (!address) return;
+    if (!address || !repayAmount) return;
     
     try {
       setLoading(true);
       
-      // Create repay transaction
-      const { unsignedTx } = await repayLoan(
-        position.id,
-        repayAmount
-      );
+      // Get repay transaction
+      const { unsignedTx } = await repayLoan(position.id, { amount: repayAmount });
 
       // Sign transaction with wallet
       const signedTx = await signTransaction(unsignedTx);
 
-      // TODO: Submit signed transaction to network
-      console.log('Signed transaction:', signedTx);
+      // Broadcast signed transaction
+      await broadcastTransaction(signedTx);
 
       onClose();
     } catch (error) {
@@ -52,17 +49,14 @@ export function RepayModal({ position, onClose }: RepayModalProps) {
         <div className="space-y-4">
           <div>
             <div className="text-sm text-gray-400 mb-2">
-              Total Owed: {totalOwed.toFixed(2)} FUSD
+              Total Owed: {totalOwed.toFixed(2)} CAT20
             </div>
-            <label className="block text-sm text-gray-400 mb-1">
-              Repay Amount (FUSD)
-            </label>
             <input
               type="number"
               value={repayAmount}
               onChange={(e) => setRepayAmount(e.target.value)}
               className="w-full bg-gray-700 rounded-lg px-4 py-2"
-              placeholder="0.0"
+              placeholder="Amount to repay"
               max={totalOwed}
             />
             <button

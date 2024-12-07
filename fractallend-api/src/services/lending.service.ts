@@ -1,51 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { LendingPool } from '../entities/lending-pool.entity';
 import { LoanPosition } from '../entities/loan-position.entity';
-import { PriceData } from '../types/lending.types';
 import { InscriptionService } from './inscription.service';
 import { VaultConfigService } from './config.service';
 
 @Injectable()
 export class LendingService {
-  private readonly unisatApiKey: string;
-
   constructor(
-    @InjectRepository(LendingPool)
-    private readonly lendingPoolRepository: Repository<LendingPool>,
     @InjectRepository(LoanPosition)
     private readonly loanPositionRepository: Repository<LoanPosition>,
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
     private readonly inscriptionService: InscriptionService,
     private readonly vaultConfigService: VaultConfigService,
-  ) {
-    this.unisatApiKey = this.configService.get<string>('UNISAT_API_KEY');
-  }
-
-  private getVaultAddress(): string {
-    return this.vaultConfigService.getVaultAddress();
-  }
-
-  async getInscriptionPrice(tokenId: string): Promise<PriceData> {
-    const url = `https://open-api-fractal.unisat.io/v1/cat20-dex/getTokenPrice?tokenId=${tokenId}`;
-    
-    const { data } = await this.httpService.get(url, {
-      headers: {
-        Authorization: `Bearer ${this.unisatApiKey}`,
-      },
-    }).toPromise();
-
-    return data.data;
-  }
+  ) {}
 
   async getLoanPosition(id: string): Promise<LoanPosition> {
     const position = await this.loanPositionRepository.findOne({
-      where: { id },
-      relations: ['pool']
+      where: { id }
     });
 
     if (!position) {
@@ -55,104 +26,38 @@ export class LendingService {
     return position;
   }
 
-  async calculateHealthFactor(positionOrId: string | LoanPosition): Promise<number> {
-    const position = typeof positionOrId === 'string' 
-      ? await this.getLoanPosition(positionOrId)
-      : positionOrId;
+  async getLoanPositions(address: string): Promise<LoanPosition[]> {
+    return this.loanPositionRepository.find({
+      where: [
+        { borrower: address },
+        { lender: address }
+      ]
+    });
+  }
 
-    const pool = position.pool;
-    
-    // Get current prices
-    const collateralPrice = await this.getInscriptionPrice(pool.collateralTokenId);
-    const lendingTokenPrice = await this.getInscriptionPrice(pool.lendingTokenId);
+  async calculateHealthFactor(position: LoanPosition): Promise<number> {
+    // Get current prices from UniSat API
+    const inscriptionPrice = await this.inscriptionService.getInscriptionPrice(position.collateralInscriptionId);
+    const cat20Price = await this.inscriptionService.getTokenPrice(position.borrowedTokenId);
 
-    const collateralValue = parseFloat(position.collateralAmount) * collateralPrice.latestTradePrice;
-    const borrowedValue = parseFloat(position.borrowedAmount) * lendingTokenPrice.latestTradePrice;
+    const collateralValue = parseFloat(position.collateralAmount) * inscriptionPrice.latestTradePrice;
+    const borrowedValue = parseFloat(position.borrowedAmount) * cat20Price.latestTradePrice;
 
     return collateralValue / borrowedValue;
   }
 
-  async createLoanPosition(
+  async createLoanRequest(
     borrower: string,
-    poolId: string,
+    collateralInscriptionId: string,
+    borrowedTokenId: string,
     collateralAmount: string,
     borrowAmount: string,
+    interestRate: number,
+    duration: number,
   ): Promise<LoanPosition> {
-    const pool = await this.lendingPoolRepository.findOneBy({ id: poolId });
-    if (!pool) {
-      throw new NotFoundException(`Lending pool ${poolId} not found`);
-    }
-    
-    // Check if pool has enough liquidity
-    const availableLiquidity = parseFloat(pool.totalDeposited) - parseFloat(pool.totalBorrowed);
-    if (availableLiquidity < parseFloat(borrowAmount)) {
-      throw new Error('Insufficient liquidity in pool');
-    }
-
-    // Create position
-    const position = this.loanPositionRepository.create({
-      borrower,
-      pool,
-      collateralAmount,
-      borrowedAmount: borrowAmount,
-      interestAccrued: '0',
-      lastUpdateTime: Date.now(),
-      status: 'active',
-    });
-
-    // Calculate health factor
-    position.healthFactor = await this.calculateHealthFactor(position);
-    if (position.healthFactor < pool.minimumCollateralRatio) {
-      throw new Error('Insufficient collateral ratio');
-    }
-
-    // Save position
-    await this.loanPositionRepository.save(position);
-
-    // Update pool state
-    pool.totalBorrowed = (parseFloat(pool.totalBorrowed) + parseFloat(borrowAmount)).toString();
-    await this.lendingPoolRepository.save(pool);
-
-    return position;
-  }
-
-  async getActivePositions(): Promise<LoanPosition[]> {
-    return this.loanPositionRepository.find({
-      where: { status: 'active' },
-      relations: ['pool']
-    });
-  }
-
-
-  async checkLiquidations(): Promise<void> {
-    const activePositions = await this.getActivePositions();
-
-    for (const position of activePositions) {
-      const healthFactor = await this.calculateHealthFactor(position);
-      
-      if (healthFactor < position.pool.liquidationThreshold) {
-        await this.liquidatePosition(position);
-      }
-    }
-  }
-
-  private async liquidatePosition(position: LoanPosition): Promise<void> {
-    position.status = 'liquidated';
-    await this.loanPositionRepository.save(position);
-    
-    // TODO: Implement auction creation logic
-    // This will involve creating a new auction entity and
-    // transferring the collateral to the auction contract
-  }
-
-  async depositCollateral(
-    borrower: string,
-    poolId: string,
-    inscriptionId: string,
-  ): Promise<void> {
     // Verify inscription ownership
     const isOwner = await this.inscriptionService.verifyInscriptionOwnership(
-      inscriptionId,
+      collateralInscriptionId,
       borrower
     );
 
@@ -160,43 +65,154 @@ export class LendingService {
       throw new Error('Borrower does not own the inscription');
     }
 
-    // Create transfer transaction
-    const { unsignedTx } = await this.inscriptionService.createTransferInscription(
-      inscriptionId,
+    // Create loan position
+    const position = this.loanPositionRepository.create({
       borrower,
-      this.getVaultAddress() // todo need to implement this
-    );
+      collateralInscriptionId,
+      borrowedTokenId,
+      collateralAmount,
+      borrowedAmount: borrowAmount,
+      interestRate,
+      duration,
+      startTime: null, // Will be set when loan is funded
+      interestAccrued: '0',
+      lastUpdateTime: Date.now(),
+      status: 'pending',
+      healthFactor: 0, // Will be calculated when funded
+      liquidationThreshold: 1.5, // Default threshold
+    });
 
-    // Return unsigned transaction for wallet to sign
-    return unsignedTx;
+    // Save position
+    await this.loanPositionRepository.save(position);
+
+    return position;
   }
 
-  async releaseCollateral(
+  async fundLoan(
+    lender: string,
+    loanId: string,
+  ): Promise<{ unsignedTx: string }> {
+    const loan = await this.getLoanPosition(loanId);
+    
+    if (loan.status !== 'pending') {
+      throw new Error('Loan is not in pending status');
+    }
+
+    // Create CAT20 transfer transaction from lender to borrower
+    const unsignedTx = await this.inscriptionService.createCat20Transfer(
+      loan.borrowedTokenId,
+      lender,
+      loan.borrower,
+      loan.borrowedAmount
+    );
+
+    // Update loan status
+    loan.status = 'active';
+    loan.startTime = Date.now();
+    loan.lender = lender;
+    await this.loanPositionRepository.save(loan);
+
+    return { unsignedTx };
+  }
+
+  async depositCollateral(
     loanId: string,
     borrower: string,
-  ): Promise<void> {
+  ): Promise<{ unsignedTx: string }> {
     const loan = await this.getLoanPosition(loanId);
     
     if (loan.borrower !== borrower) {
       throw new Error('Not the loan owner');
     }
 
+    if (loan.status !== 'pending') {
+      throw new Error('Loan is not in pending status');
+    }
+
+    // Create inscription transfer transaction to vault
+    const { unsignedTx } = await this.inscriptionService.createTransferInscription(
+      loan.collateralInscriptionId,
+      borrower,
+      this.vaultConfigService.getVaultAddress()
+    );
+
+    return { unsignedTx };
+  }
+
+  async repayLoan(
+    loanId: string,
+    amount: string,
+  ): Promise<{ unsignedTx: string }> {
+    const loan = await this.getLoanPosition(loanId);
+    
     if (loan.status !== 'active') {
       throw new Error('Loan is not active');
     }
 
-    // Check if loan is fully repaid
-    if (parseFloat(loan.borrowedAmount) > 0) {
-      throw new Error('Loan not fully repaid');
+    const totalOwed = parseFloat(loan.borrowedAmount) + parseFloat(loan.interestAccrued);
+    if (parseFloat(amount) > totalOwed) {
+      throw new Error('Repayment amount exceeds total owed');
     }
 
-    // Create transfer transaction back to borrower
-    const { unsignedTx } = await this.inscriptionService.createTransferInscription(
-      loan.collateralInscriptionId,
-      this.getVaultAddress(),
-      borrower
+    // Create CAT20 transfer transaction from borrower to lender
+    const unsignedTx = await this.inscriptionService.createCat20Transfer(
+      loan.borrowedTokenId,
+      loan.borrower,
+      loan.lender,
+      amount
     );
 
-    return unsignedTx;
+    // Update loan state after repayment confirmation
+    const newBorrowedAmount = totalOwed - parseFloat(amount);
+    loan.borrowedAmount = newBorrowedAmount.toString();
+    
+    if (newBorrowedAmount === 0) {
+      loan.status = 'repaid';
+      // Trigger collateral release
+      await this.releaseCollateral(loanId);
+    }
+
+    await this.loanPositionRepository.save(loan);
+
+    return { unsignedTx };
+  }
+
+  async releaseCollateral(loanId: string): Promise<{ unsignedTx: string }> {
+    const loan = await this.getLoanPosition(loanId);
+    
+    if (loan.status !== 'repaid') {
+      throw new Error('Loan must be fully repaid');
+    }
+
+    // Create inscription transfer transaction back to borrower
+    const { unsignedTx } = await this.inscriptionService.createTransferInscription(
+      loan.collateralInscriptionId,
+      this.vaultConfigService.getVaultAddress(),
+      loan.borrower
+    );
+
+    return { unsignedTx };
+  }
+
+  async checkLiquidations(): Promise<void> {
+    const activeLoans = await this.loanPositionRepository.find({
+      where: { status: 'active' }
+    });
+
+    for (const loan of activeLoans) {
+      const healthFactor = await this.calculateHealthFactor(loan);
+      
+      if (healthFactor < loan.liquidationThreshold) {
+        await this.liquidatePosition(loan);
+      }
+    }
+  }
+
+  private async liquidatePosition(loan: LoanPosition): Promise<void> {
+    loan.status = 'liquidated';
+    await this.loanPositionRepository.save(loan);
+    
+    // Create auction for the collateral
+    // TODO: Implement auction creation
   }
 } 

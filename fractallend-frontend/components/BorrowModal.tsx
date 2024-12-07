@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 import { useWallet } from '@/contexts/WalletContext';
-import { LendingPool } from '@/types/lending';
-import { createLoanPosition } from '@/lib/api';
+import { CreateLoanRequest } from '@/types/lending';
+import { createLoanRequest, depositCollateral, broadcastTransaction } from '@/lib/api';
 
 interface BorrowModalProps {
-  pool: LendingPool;
   onClose: () => void;
 }
 
-export function BorrowModal({ pool, onClose }: BorrowModalProps) {
+export function BorrowModal({ onClose }: BorrowModalProps) {
   const { address, signTransaction } = useWallet();
+  const [collateralInscriptionId, setCollateralInscriptionId] = useState('');
+  const [borrowedTokenId, setBorrowedTokenId] = useState('');
   const [collateralAmount, setCollateralAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
+  const [interestRate, setInterestRate] = useState('');
+  const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleBorrow = async () => {
@@ -22,23 +25,31 @@ export function BorrowModal({ pool, onClose }: BorrowModalProps) {
     try {
       setLoading(true);
       
-      // Create loan position and get unsigned transaction
-      const { unsignedTx } = await createLoanPosition(
-        address,
-        pool.id,
+      // Create loan request
+      const request: CreateLoanRequest = {
+        borrower: address,
+        collateralInscriptionId,
+        borrowedTokenId,
         collateralAmount,
-        borrowAmount
-      );
+        borrowAmount,
+        interestRate: parseFloat(interestRate),
+        duration: parseInt(duration) * 86400, // Convert days to seconds
+      };
+
+      const loan = await createLoanRequest(request);
+
+      // Get deposit transaction
+      const { unsignedTx } = await depositCollateral(loan.id, address);
 
       // Sign transaction with wallet
       const signedTx = await signTransaction(unsignedTx);
 
-      // TODO: Submit signed transaction to network
-      console.log('Signed transaction:', signedTx);
+      // Broadcast signed transaction
+      await broadcastTransaction(signedTx);
 
       onClose();
     } catch (error) {
-      console.error('Error borrowing:', error);
+      console.error('Error creating loan:', error);
       // TODO: Show error message
     } finally {
       setLoading(false);
@@ -48,12 +59,38 @@ export function BorrowModal({ pool, onClose }: BorrowModalProps) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
-        <h3 className="text-xl font-semibold mb-4">Borrow {pool.lendingTokenSymbol}</h3>
+        <h3 className="text-xl font-semibold mb-4">Create Loan Request</h3>
         
         <div className="space-y-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1">
-              Collateral Amount ({pool.collateralTokenSymbol})
+              Inscription ID
+            </label>
+            <input
+              type="text"
+              value={collateralInscriptionId}
+              onChange={(e) => setCollateralInscriptionId(e.target.value)}
+              className="w-full bg-gray-700 rounded-lg px-4 py-2"
+              placeholder="Inscription ID to use as collateral"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              CAT20 Token ID
+            </label>
+            <input
+              type="text"
+              value={borrowedTokenId}
+              onChange={(e) => setBorrowedTokenId(e.target.value)}
+              className="w-full bg-gray-700 rounded-lg px-4 py-2"
+              placeholder="Token ID to borrow"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Collateral Amount
             </label>
             <input
               type="number"
@@ -66,7 +103,7 @@ export function BorrowModal({ pool, onClose }: BorrowModalProps) {
 
           <div>
             <label className="block text-sm text-gray-400 mb-1">
-              Borrow Amount ({pool.lendingTokenSymbol})
+              Borrow Amount
             </label>
             <input
               type="number"
@@ -74,6 +111,32 @@ export function BorrowModal({ pool, onClose }: BorrowModalProps) {
               onChange={(e) => setBorrowAmount(e.target.value)}
               className="w-full bg-gray-700 rounded-lg px-4 py-2"
               placeholder="0.0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Interest Rate (% APR)
+            </label>
+            <input
+              type="number"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              className="w-full bg-gray-700 rounded-lg px-4 py-2"
+              placeholder="5.0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Duration (Days)
+            </label>
+            <input
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              className="w-full bg-gray-700 rounded-lg px-4 py-2"
+              placeholder="30"
             />
           </div>
 
@@ -86,10 +149,10 @@ export function BorrowModal({ pool, onClose }: BorrowModalProps) {
             </button>
             <button
               onClick={handleBorrow}
-              disabled={loading || !collateralAmount || !borrowAmount}
+              disabled={loading || !collateralInscriptionId || !borrowedTokenId || !collateralAmount || !borrowAmount || !interestRate || !duration}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg py-2 px-4"
             >
-              {loading ? 'Processing...' : 'Borrow'}
+              {loading ? 'Creating...' : 'Create Request'}
             </button>
           </div>
         </div>
