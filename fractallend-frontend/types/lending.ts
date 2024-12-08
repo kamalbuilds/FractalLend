@@ -14,19 +14,13 @@ export interface LendingPool {
 export interface LoanPosition {
   id: string;
   borrower: string;
-  lender?: string;
-  collateralInscriptionId: string;
-  borrowedTokenId: string;
+  poolId: string;
   collateralAmount: string;
   borrowedAmount: string;
-  interestRate: number;
-  duration: number;
-  startTime?: number;
   interestAccrued: string;
   lastUpdateTime: number;
   healthFactor: number;
-  liquidationThreshold: number;
-  status: 'pending' | 'active' | 'repaid' | 'liquidated' | 'closed';
+  status: 'active' | 'liquidated' | 'closed';
 }
 
 export interface TokenPrice {
@@ -37,36 +31,30 @@ export interface TokenPrice {
   height: number;
 }
 
-export interface Inscription {
-  id: string;
-  number: number;
-  address: string;
-  content: string;
+export interface NFTCollection {
+  inscriptionId: string;
+  name: string;
+  description?: string;
+  supply: number;
+  floorPrice: number;
+  imageUrl: string;
+  totalListed: number;
+  verification: boolean;
+  btcValue: number;
+  socialLinks: {
+    twitter: string;
+    discord: string;
+    website: string;
+  };
+}
+
+export interface CollectionInscription {
+  collectionId: string;
+  collectionName: string;
+  collectionItemName: string;
+  collectionHighResImgUrl: string;
+  inscriptionId: string;
+  inscriptionNumber: number;
   contentType: string;
-  contentLength: number;
-  timestamp: string;
-  genesisHeight: number;
-  genesisFee: number;
-  genesisTransaction: string;
-  location: string;
-  output: string;
-  offset: number;
-}
-
-export interface CreateLoanRequest {
-  borrower: string;
-  collateralInscriptionId: string;
-  borrowedTokenId: string;
-  collateralAmount: string;
-  borrowAmount: string;
-  interestRate: number;
-  duration: number;
-}
-
-export interface FundLoanRequest {
-  lender: string;
-}
-
-export interface RepayLoanRequest {
-  amount: string;
+  listed: boolean;
 } 
