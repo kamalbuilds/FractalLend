@@ -32,6 +32,16 @@ export function Navigation() {
                 Lending
               </Link>
               <Link
+                href="/borrow"
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  isActive('/borrow')
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                Borrow
+              </Link>
+              <Link
                 href="/auctions"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
                   isActive('/auctions')

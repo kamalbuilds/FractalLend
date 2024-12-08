@@ -5,7 +5,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { NFTCollection } from '@/types/lending';
 import { getNFTCollections } from '@/lib/nftApi';
 import { ConnectButton } from '@/components/ConnectButton';
-import { CreateLoanModal } from '@/components/CreateLoanModal';
+import { LendingModal } from '@/components/LendingModal';
 
 export default function LendingPage() {
   const { address } = useWallet();
@@ -30,7 +30,7 @@ export default function LendingPage() {
   }, []);
 
   const formatBTC = (sats: number) => {
-    return (sats / 100_000_000).toFixed(8);
+    return (sats / 100_000_000).toFixed(6);
   };
 
   if (loading) {
@@ -82,7 +82,7 @@ export default function LendingPage() {
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-gray-500">Floor Price</p>
-                        <p className="font-semibold">{formatBTC(collection.floorPrice)} BTC</p>
+                        <p className="font-semibold">{formatBTC(collection.floorPrice)} FBTC</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Listed/Total</p>
@@ -137,7 +137,7 @@ export default function LendingPage() {
       )}
 
       {selectedCollection && showCreateModal && (
-        <CreateLoanModal
+        <LendingModal
           collection={selectedCollection}
           isOpen={showCreateModal}
           onClose={() => {

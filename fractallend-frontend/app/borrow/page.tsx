@@ -2,106 +2,149 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/contexts/WalletContext';
-import { LoanPosition } from '@/types/lending';
-import { getLoanPositions } from '@/lib/api';
-import { BorrowModal } from '@/components/BorrowModal';
-import { PositionCard } from '@/components/PositionCard';
+import { NFTCollection } from '@/types/lending';
+import { getNFTCollections } from '@/lib/nftApi';
 import { ConnectButton } from '@/components/ConnectButton';
+import { BorrowModal } from '@/components/BorrowModal';
 
-export default function LendingPage() {
+export default function BorrowPage() {
   const { address } = useWallet();
-  const [positions, setPositions] = useState<LoanPosition[]>([]);
-  const [showBorrowModal, setShowBorrowModal] = useState(false);
+  const [collections, setCollections] = useState<NFTCollection[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<NFTCollection | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCollections = async () => {
       try {
-        if (address) {
-          const positionsData = await getLoanPositions(address);
-          setPositions(positionsData);
-        }
+        const collectionsData = await getNFTCollections();
+        setCollections(collectionsData);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching collections:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [address]);
+    fetchCollections();
+  }, []);
 
-  const myBorrowedLoans = positions.filter(p => p.borrower === address);
-  const myLentLoans = positions.filter(p => p.lender === address);
-  const availableLoans = positions.filter(p => p.status === 'pending' && p.borrower !== address);
+  const formatBTC = (sats: number) => {
+    return (sats / 100_000_000).toFixed(8);
+  };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">P2P Lending</h1>
-        
+        <h1 className="text-4xl font-bold">Borrow CAT20 Coins with your Ordinals</h1>
         {!address ? (
           <ConnectButton />
-        ) : (
-          <button
-            onClick={() => setShowBorrowModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4"
-          >
-            Create Loan Request
-          </button>
-        )}
+        ) : null}
       </div>
-      
+
       {address ? (
         <div className="space-y-8">
-          {myBorrowedLoans.length > 0 && (
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">My Borrowed Loans</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myBorrowedLoans.map((position) => (
-                  <PositionCard key={position.id} position={position} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {myLentLoans.length > 0 && (
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">My Lent Loans</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myLentLoans.map((position) => (
-                  <PositionCard key={position.id} position={position} />
-                ))}
-              </div>
-            </section>
-          )}
-
           <section>
-            <h2 className="text-2xl font-semibold mb-4">Available Loan Requests</h2>
-            {availableLoans.length === 0 ? (
-              <p className="text-gray-500">No loan requests available</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableLoans.map((loan) => (
-                  <PositionCard key={loan.id} position={loan} />
-                ))}
-              </div>
-            )}
+            <h2 className="text-2xl font-semibold mb-6">Available Collections</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {collections.map((collection) => (
+                <div 
+                  key={collection.inscriptionId}
+                  className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                >
+                  <div className="relative aspect-square">
+                    <img
+                      src={collection.imageUrl}
+                      alt={collection.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {collection.verification && (
+                      <span className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="p-4">
+                    <h3 className="text-xl font-semibold mb-2">{collection.name}</h3>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                      {collection.description}
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Floor Price</p>
+                        <p className="font-semibold">{formatBTC(collection.floorPrice)} BTC</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Listed/Total</p>
+                        <p className="font-semibold">{collection.totalListed}/{collection.supply}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mb-4">
+                      {collection.socialLinks.twitter && (
+                        <a href={collection.socialLinks.twitter} target="_blank" rel="noopener noreferrer" 
+                           className="text-blue-500 hover:text-blue-600">
+                          Twitter
+                        </a>
+                      )}
+                      {collection.socialLinks.discord && (
+                        <a href={collection.socialLinks.discord} target="_blank" rel="noopener noreferrer"
+                           className="text-indigo-500 hover:text-indigo-600">
+                          Discord
+                        </a>
+                      )}
+                      {collection.socialLinks.website && (
+                        <a href={collection.socialLinks.website} target="_blank" rel="noopener noreferrer"
+                           className="text-gray-500 hover:text-gray-600">
+                          Website
+                        </a>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedCollection(collection);
+                        setShowCreateModal(true);
+                      }}
+                      className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Borrow CAT20
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       ) : (
-        <div className="text-center">
-          <p className="mb-4">Connect your wallet to start lending or borrowing</p>
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-semibold mb-4">Connect Your Wallet</h2>
+          <p className="text-gray-600 mb-6">
+            Connect your wallet to start lending or borrowing against NFT collections
+          </p>
           <ConnectButton />
         </div>
       )}
 
-      {showBorrowModal && (
-        <BorrowModal onClose={() => setShowBorrowModal(false)} />
+      {selectedCollection && showCreateModal && (
+        <BorrowModal
+          collection={selectedCollection}
+          isOpen={showCreateModal}
+          onClose={() => {
+            setShowCreateModal(false);
+            setSelectedCollection(null);
+          }}
+        />
       )}
     </div>
   );
