@@ -60,13 +60,13 @@ export function LendingModal({ collection, isOpen, onClose }: LendingModalProps)
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Lend CAT20 Tokens</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+          <h2 className="text-2xl text-green-400 font-bold">Lend CAT20 Tokens</h2>
+          <button onClick={onClose} className="text-blue-500 hover:text-blue-700">✕</button>
         </div>
 
         <div className="mb-6">
           <h3 className="font-semibold text-lg">{collection.name}</h3>
-          <p className="text-gray-600">Collateral Value: {collection.floorPrice / 100_000_000} BTC</p>
+          <p className="text-blue-600">Collateral Value: {collection.floorPrice / 100_000_000} BTC</p>
         </div>
 
         {loading ? (
@@ -74,7 +74,7 @@ export function LendingModal({ collection, isOpen, onClose }: LendingModalProps)
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-blue-700 mb-1">
                 Select CAT20 Token
               </label>
               <select
@@ -96,7 +96,7 @@ export function LendingModal({ collection, isOpen, onClose }: LendingModalProps)
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-blue-700 mb-1">
                 Amount (min {minLoanAmount} BTC worth)
               </label>
               <input
@@ -110,8 +110,8 @@ export function LendingModal({ collection, isOpen, onClose }: LendingModalProps)
               />
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Loan Terms</h4>
+            <div className="bg-blue-50 p-4 rounded-lg text-black">
+              <h4 className="font-medium mb-2 ">Loan Terms</h4>
               <ul className="space-y-2 text-sm">
                 <li>Duration: {duration} days</li>
                 <li>Collateral: {collection.name}</li>
@@ -126,7 +126,7 @@ export function LendingModal({ collection, isOpen, onClose }: LendingModalProps)
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-blue-600 hover:text-blue-800"
               >
                 Cancel
               </button>

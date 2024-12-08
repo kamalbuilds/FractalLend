@@ -5,7 +5,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { NFTCollection } from '@/types/lending';
 import { getNFTCollections } from '@/lib/nftApi';
 import { ConnectButton } from '@/components/ConnectButton';
-import { BorrowModal } from '@/components/BorrowModal';
+import { CreateLoanModal } from '@/components/CreateLoanModal';
 
 export default function BorrowPage() {
   const { address } = useWallet();
@@ -137,7 +137,7 @@ export default function BorrowPage() {
       )}
 
       {selectedCollection && showCreateModal && (
-        <BorrowModal
+        <CreateLoanModal
           collection={selectedCollection}
           isOpen={showCreateModal}
           onClose={() => {
