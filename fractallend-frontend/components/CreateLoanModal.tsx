@@ -10,7 +10,7 @@ interface CreateLoanModalProps {
 export function CreateLoanModal({ collection, isOpen, onClose }: CreateLoanModalProps) {
   const [interestRate, setInterestRate] = useState('');
   const [duration, setDuration] = useState('');
-  const [maxLoanAmount, setMaxLoanAmount] = useState('');
+  const maxLoanAmount = 0.75 * collection.floorPrice;
 
   if (!isOpen) return null;
 
@@ -22,7 +22,7 @@ export function CreateLoanModal({ collection, isOpen, onClose }: CreateLoanModal
       collectionId: collection.inscriptionId,
       interestRate: parseFloat(interestRate),
       duration: parseInt(duration),
-      maxLoanAmount: parseInt(maxLoanAmount),
+      maxLoanAmount: maxLoanAmount,
     });
     
     onClose();
@@ -32,7 +32,7 @@ export function CreateLoanModal({ collection, isOpen, onClose }: CreateLoanModal
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Create Loan Offer</h2>
+          <h2 className="text-2xl font-bold text-green">Create Loan Offer</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
@@ -85,7 +85,7 @@ export function CreateLoanModal({ collection, isOpen, onClose }: CreateLoanModal
             <input
               type="number"
               value={maxLoanAmount}
-              onChange={(e) => setMaxLoanAmount(e.target.value)}
+              disabled={true}
               className="w-full p-2 border rounded-lg"
               min="1"
               max={collection.floorPrice}

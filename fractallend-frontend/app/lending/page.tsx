@@ -44,7 +44,7 @@ export default function LendingPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">NFT Lending Market</h1>
+        <h1 className="text-4xl font-bold">Borrow CAT20 Coins with your Ordinals</h1>
         {!address ? (
           <ConnectButton />
         ) : null}

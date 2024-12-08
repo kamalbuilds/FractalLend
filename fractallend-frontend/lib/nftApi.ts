@@ -1,18 +1,13 @@
-import axios from 'axios';
 import { NFTCollection } from '@/types/lending';
 
 const UNISAT_API_KEY = process.env.NEXT_PUBLIC_UNISAT_API_KEY;
-const unisatApi = axios.create({
-  baseURL: 'https://open-api.unisat.io',
-  headers: {
-    'Authorization': `Bearer ${UNISAT_API_KEY}`
-  }
-});
+console.log(UNISAT_API_KEY, "unisat api key");
+const UNISAT_BASE_URL = 'https://open-api-fractal.unisat.io';
 
 // Static list of collection IDs we want to support
 const SUPPORTED_COLLECTIONS = [
   'Frazuki',
-  'fractal_raffle',
+  'Fractal_Satoshis',
   // Add more collection IDs here
 ];
 
@@ -38,13 +33,52 @@ interface UnisatCollectionResponse {
   };
 }
 
+// Add interface for collection inscriptions response
+interface UnisatInscriptionsResponse {
+  code: number;
+  msg: string;
+  data: {
+    list: Array<{
+      collectionId: string;
+      collectionName: string;
+      collectionItemName: string;
+      collectionHighResImgUrl: string;
+      inscriptionId: string;
+      inscriptionNumber: number;
+      contentType: string;
+      listed: boolean;
+    }>;
+    total: number;
+  };
+}
+
+async function unisatFetch<T>(endpoint: string, body: any): Promise<T> {
+    console.log(`${UNISAT_BASE_URL}${endpoint}`, "url is here>>>" , JSON.stringify(body));
+  const response = await fetch(`${UNISAT_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${UNISAT_API_KEY}`
+    },
+    body: JSON.stringify(body)
+  });
+
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export const getCollectionDetails = async (collectionId: string): Promise<NFTCollection> => {
   try {
-    const { data: response } = await unisatApi.post<UnisatCollectionResponse>(
+    const response = await unisatFetch<UnisatCollectionResponse>(
       '/v3/market/collection/auction/collection_statistic',
       { collectionId }
     );
 
+    console.log(response, "response from the nft api");
     if (response.code !== 0) {
       throw new Error(response.msg);
     }
@@ -93,7 +127,7 @@ export const getCollectionInscriptions = async (
   limit = 20
 ) => {
   try {
-    const { data: response } = await unisatApi.post(
+    const response = await unisatFetch<UnisatInscriptionsResponse>(
       '/v3/market/collection/auction/collection_inscriptions',
       {
         collectionId,
@@ -103,6 +137,7 @@ export const getCollectionInscriptions = async (
       }
     );
 
+    console.log(response, "response from the nft api");
     if (response.code !== 0) {
       throw new Error(response.msg);
     }
